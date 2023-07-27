@@ -35,22 +35,13 @@ def create_parser():
     """
 
     parser = argparse.ArgumentParser("Google Scholar requester.")
-    # parser.add_argument(
-    #     "-p",
-    #     "--params_name",
-    #     type=str,
-    #     required=True,
-    #     help=("Name of params dictionary stored in a config file."),
-    # )
     parser.add_argument(
         "-r",
         "--requests_count",
         type=int,
         required=False,
         default=1,
-        help=(
-            "Number of API requests (paged response = 10 records). Default requests_count = 1."
-        ),
+        help=("Number of API requests (paged response = 10 records). Default requests_count = 1"),
     )
     return parser
 
@@ -68,6 +59,27 @@ def filter_data(data: list, keys: tuple) -> dict:
     """
 
     return {key: val for key, val in data.items() if key in keys}
+
+
+def retrieve_citation(html: str) -> dict:
+    """Return citation attributes from passed-in <html>.
+
+    Parameters:
+        html (str): chunk of HTML
+
+    Returns:
+        dict: dictionary representation of a citation
+    """
+
+    return {
+        "title": html.select_one(".gs_rt").text,
+        "title_url": select_value_by_key(html.select_one(".gs_rt a"), "href"),
+        "pub_info": html.select_one(".gs_a").text,
+        "snippet": html.select_one(".gs_rs").text,
+        "cited_by": select_value_by_key(html.select_one("#gs_res_ccl_mid .gs_nph+ a"), "href"),
+        "pdf_url": select_value_by_key(html.select_one(".gs_or_ggsm a:nth-child(1)"), "href"),
+        # "related_articles": select_value_by_key(result.select_one("#gs_res_ccl_mid .gs_nph+ a+ a"), "href"),
+    }
 
 
 def select_value_by_key(selector, key):
@@ -127,6 +139,9 @@ def main(args):
             "Connection": "keep-alive",
             "User-Agent": ua.get_random_user_agent(),
         }
+
+        # TODO ADD API KEY TO PARAMS
+
         # params = {"start": i, "q": "UMMZ+bird", "hl": "en", "as_sdt": "0, 23"}
         params = {"start": i, "q": "UMMZ+bird", "hl": "en", "as_sdt": "0, 23"}
 
@@ -140,19 +155,7 @@ def main(args):
 
         soup = BeautifulSoup(html, "lxml")
         for result in soup.select(".gs_r.gs_or.gs_scl"):
-            citation = {
-                "title": result.select_one(".gs_rt").text,
-                "title_url": select_value_by_key(result.select_one(".gs_rt a"), "href"),
-                "pub_info": result.select_one(".gs_a").text,
-                "snippet": result.select_one(".gs_rs").text,
-                "cited_by": select_value_by_key(
-                    result.select_one("#gs_res_ccl_mid .gs_nph+ a"), "href"
-                ),
-                "pdf_url": select_value_by_key(
-                    result.select_one(".gs_or_ggsm a:nth-child(1)"), "href"
-                ),
-                # "related_articles": select_value_by_key(result.select_one("#gs_res_ccl_mid .gs_nph+ a+ a"), "href"),
-            }
+            citation = retrieve_citation(result)
             citations.append(citation)
 
         # print(json.dumps(citations, indent=2, ensure_ascii=False))
@@ -172,10 +175,9 @@ def main(args):
         time.sleep(12)  # pause to confound rate limit
 
     # Write to file
-    umpy.write.to_json(
-        f"./output/google_scholar-ummz-bird-{dt.now().strftime('%Y%m%dT%H%M')}.json",
-        citations,
-    )
+    filepath = f"./output/google_scholar-ummz-bird-{dt.now().strftime('%Y%m%dT%H%M')}.json"
+    umpy.write.to_json(filepath, citations)
+    logger.info(f"File written to {filepath}")
 
     # logger.info(f"Total articles retrieved = {len(articles)}")
 

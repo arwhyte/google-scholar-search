@@ -3,6 +3,9 @@
 # https://github.com/django/django/blob/master/.gitignore
 # https://www.gitignore.io/api/django,python,intellij (bloated)
 
+# Output files
+*.json
+
 ### VS Code ###
 *.code-workspace
 .vscode/
