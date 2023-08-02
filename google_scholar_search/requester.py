@@ -12,7 +12,7 @@ import user_agents as ua
 from bs4 import BeautifulSoup
 from datetime import datetime as dt
 
-BASE_URL = "https://scholar.google.com/scholar"
+BASE_URL = "https://scholar.google.com"
 KEYS = ()
 
 
@@ -146,7 +146,7 @@ def main(args):
         params = {"start": i, "q": "UMMZ+bird", "hl": "en", "as_sdt": "0, 23"}
 
         # response = umpy.http.get_resource(BASE_URL, params)
-        response = requests.get(BASE_URL, params=params, headers=headers)
+        response = requests.get(f"{BASE_URL}/scholar", params=params, headers=headers)
 
         print(response.request.headers)
 
