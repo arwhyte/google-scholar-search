@@ -9,6 +9,7 @@ googlesearch-python==1.2.3
 idna==3.4
 jmespath==1.0.1
 lxml==4.9.2
+lxml-stubs==0.4.0
 mypy==1.4.1
 mypy-extensions==1.0.0
 packaging==23.1
@@ -18,6 +19,11 @@ platformdirs==3.8.0
 PyYAML==6.0
 requests==2.31.0
 soupsieve==2.4.1
+types-beautifulsoup4==4.12.0.6
+types-html5lib==1.1.11.15
+types-PyYAML==6.0.12.11
+types-requests==2.31.0.2
+types-urllib3==1.26.25.14
 typing_extensions==4.6.3
 umpyutl==2.1.0
 urllib3==2.0.3
