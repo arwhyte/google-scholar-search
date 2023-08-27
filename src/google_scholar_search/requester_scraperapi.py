@@ -1,7 +1,6 @@
 import argparse
-import json
+import bs4
 import logging
-import lxml
 import requests
 import secrets
 import sys
@@ -9,7 +8,6 @@ import time
 import umpyutl as umpy
 import user_agents as ua
 
-from bs4 import BeautifulSoup
 from datetime import datetime as dt
 
 BASE_URL = "https://scholar.google.com"
@@ -46,7 +44,7 @@ def create_parser():
     return parser
 
 
-def filter_data(data: list, keys: tuple) -> dict:
+def filter_data(data: dict, keys: tuple) -> dict:
     """Filters out article key-value pairs in favor of the select keys contained
     in the passed in < keys > tuple.
 
@@ -61,11 +59,27 @@ def filter_data(data: list, keys: tuple) -> dict:
     return {key: val for key, val in data.items() if key in keys}
 
 
-def retrieve_citation(html: str) -> dict:
+def retrieve_author_links(base_url: str, tag: bs4.Tag) -> list:
+    """Return author citation links from passed-in bs4.Tag object.
+
+    Parameters:
+        html (bs4.Tag): Tag object
+
+    Returns:
+        list: sequence of author dictionaries
+    """
+
+    return [
+        {"author_name": element.text, "url_fragment": f"{base_url}{element.get('href')}"}
+        for element in tag.find_all("a", href=True)
+    ]
+
+
+def retrieve_citation(html) -> dict:
     """Return citation attributes from passed-in <html>.
 
     Parameters:
-        html (str): chunk of HTML
+        html (BeautifulSoup.element.Tag): chunk of HTML
 
     Returns:
         dict: dictionary representation of a citation
@@ -75,12 +89,34 @@ def retrieve_citation(html: str) -> dict:
         "title": html.select_one(".gs_rt").text,
         "title_url": select_value_by_key(html.select_one(".gs_rt a"), "href"),
         "pub_info": html.select_one(".gs_a").text,
-        "pub_x": html.select
+        "author_links": retrieve_author_links(BASE_URL, html.find("div", {"class": "gs_a"})),
         "snippet": html.select_one(".gs_rs").text,
         "cited_by": select_value_by_key(html.select_one("#gs_res_ccl_mid .gs_nph+ a"), "href"),
         "pdf_url": select_value_by_key(html.select_one(".gs_or_ggsm a:nth-child(1)"), "href"),
         # "related_articles": select_value_by_key(result.select_one("#gs_res_ccl_mid .gs_nph+ a+ a"), "href"),
     }
+
+
+def run_async_job(
+    url, json, timeout, call_interval=5, max_calls=1000, max_retries=5, retry_interval=60
+):
+    """TODO"""
+
+    response: requests.Response = requests.post(url=url, json=json, timeout=timeout)
+    response.raise_for_status()  # raises HTTPError if one occurred
+    response: dict = response.json()
+    status: str = response["status"]
+    status_url: str = response["statusURL"]
+
+    calls: int = 0
+    while not status == "finished" and calls < max_calls:
+        time.sleep(call_interval)
+        response: requests.Response = requests.get(status_url, timeout=timeout)
+        response.raise_for_status()  # raises HTTPError if one occurred
+        response: dict = response.json()
+        status = response["status"].lower()
+        calls += 1
+    return response
 
 
 def select_value_by_key(selector, key):
@@ -126,9 +162,8 @@ def main(args):
     #     logger.info(f"Filter: {params['fq']}")
     logger.info(f"Requests count = {requests_count}")
 
-    citations = (
-        []
-    )  # TODO append 10 citations to existing JSON file (don't hold in memory all citations)
+    # TODO append 10 citations to existing JSON file (don't hold in memory all citations)
+    citations = []
     for i in range(requests_count):
         # params["page"] = i  # reset
 
@@ -148,15 +183,14 @@ def main(args):
 
         # response = umpy.http.get_resource(BASE_URL, params)
         response = requests.get(f"{BASE_URL}/scholar", params=params, headers=headers)
-
-        print(response.request.headers)
-
+        # print(response.request.headers)
         response.raise_for_status()  # if 200 returns None
-        html = response.text
+        html: str = response.text
 
-        soup = BeautifulSoup(html, "lxml")
+        soup = bs4.BeautifulSoup(html, "lxml")
         for result in soup.select(".gs_r.gs_or.gs_scl"):
-            citation = retrieve_citation(result)
+            # print(f"type result = {type(result)}") # <class 'bs4.element.Tag'>
+            citation: dict = retrieve_citation(result)
             citations.append(citation)
 
         # print(json.dumps(citations, indent=2, ensure_ascii=False))
