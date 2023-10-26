@@ -1,5 +1,5 @@
-import argparse
 import bs4
+import cli_arg_parser as ap
 import logging
 import requests
 import secrets
@@ -9,39 +9,10 @@ import umpyutl as umpy
 import user_agents as ua
 
 from datetime import datetime as dt
+from pathlib import Path
+from urllib.parse import urlencode
 
 BASE_URL = "https://scholar.google.com"
-KEYS = ()
-
-
-def create_parser():
-    """Return a custom argument parser.
-
-    Parameters:
-        None
-
-    Parser arguments:
-        short_flag (str): short version of command option
-        long_flag (str): long version of command option
-        type (str): argument type (e.g., str, int, bool)
-        required (bool): specifies whether or not command option is required
-        default (obj): default value, typically str or int
-        help (str): short description of command option
-
-    Returns:
-        parser (ArgumentParser): parser object
-    """
-
-    parser = argparse.ArgumentParser("Google Scholar requester.")
-    parser.add_argument(
-        "-r",
-        "--requests_count",
-        type=int,
-        required=False,
-        default=1,
-        help=("Number of API requests (paged response = 10 records). Default requests_count = 1"),
-    )
-    return parser
 
 
 def filter_data(data: dict, keys: tuple) -> dict:
@@ -97,26 +68,47 @@ def retrieve_citation(html) -> dict:
     }
 
 
-def run_async_job(
-    url, json, timeout, call_interval=5, max_calls=1000, max_retries=5, retry_interval=60
-):
+# def run_async_job(
+#     url, json, timeout, call_interval=5, max_calls=1000, max_retries=5, retry_interval=60
+# ):
+#     """TODO"""
+
+#     response: requests.Response = requests.post(url=url, json=json, timeout=timeout)
+#     response.raise_for_status()  # raises HTTPError if one occurred
+#     response: dict = response.json()
+#     status: str = response["status"]
+#     status_url: str = response["statusURL"]
+
+#     calls: int = 0
+#     while not status == "finished" and calls < max_calls:
+#         time.sleep(call_interval)
+#         response: requests.Response = requests.get(status_url, timeout=timeout)
+#         response.raise_for_status()  # raises HTTPError if one occurred
+#         response: dict = response.json()
+#         status = response["status"].lower()
+#         calls += 1
+#     return response
+
+
+def run_async_job(url, json, timeout=10, call_interval=5, max_calls=1000) -> dict:
     """TODO"""
 
     response: requests.Response = requests.post(url=url, json=json, timeout=timeout)
     response.raise_for_status()  # raises HTTPError if one occurred
-    response: dict = response.json()
-    status: str = response["status"]
-    status_url: str = response["statusURL"]
+    data: dict = response.json()
+    status: str = data["status"]
+    status_url: str = data["statusUrl"]
+    print(f"\nrun_async_job data={data}")
 
     calls: int = 0
     while not status == "finished" and calls < max_calls:
         time.sleep(call_interval)
         response: requests.Response = requests.get(status_url, timeout=timeout)
         response.raise_for_status()  # raises HTTPError if one occurred
-        response: dict = response.json()
-        status = response["status"].lower()
+        data: dict = response.json()
+        status = data["status"].lower()
         calls += 1
-    return response
+    return data
 
 
 def select_value_by_key(selector, key):
@@ -136,8 +128,15 @@ def select_value_by_key(selector, key):
         return None
 
 
-def main(args):
-    """Entry point to script."""
+def main(args: list) -> None:
+    """Entry point to script. Orchestrates workflow.
+
+    Parameters:
+        args (list): CLI arguments
+
+    Returns:
+        None
+    """
 
     # Configure logger: set format and default level
     logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
@@ -146,9 +145,11 @@ def main(args):
     # logger.addHandler(logging.StreamHandler(sys.stdout))
 
     # Parse CLI args
-    parser = create_parser().parse_args(args)
-    # params_name = parser.params_name
-    requests_count = parser.requests_count
+    parser = ap.create_parser("google_scholar_search")
+    cli_args = parser.parse_args(args)
+    offset: int = cli_args.offset
+    limit: int = cli_args.limit
+    query: str = cli_args.query
 
     # load YAML config retrieve querystring params
     # config = umpy.read.from_yaml("./config.yml")
@@ -157,57 +158,37 @@ def main(args):
 
     # Log requests
     logger.info(f"START RUN: {dt.now().isoformat()}")
-    # logger.info(f"Query: {params['q']}")
-    # if params.get("fq"):
-    #     logger.info(f"Filter: {params['fq']}")
-    logger.info(f"Requests count = {requests_count}")
+    logger.info(f"Query: {query}")
+    logger.info(f"Offset: {offset}")
+    logger.info(f"Limit: {limit}")
 
     # TODO append 10 citations to existing JSON file (don't hold in memory all citations)
+
     citations = []
-    for i in range(requests_count):
-        # params["page"] = i  # reset
-
-        # https://scholar.google.com/scholar?start=10&q=UMMZ+bird&hl=en&as_sdt=0,23
-
-        headers = {
-            "Accept": "application/json,text/*;q=0.9",
-            "Accept-Encoding": "gzip, deflate",
-            "Connection": "keep-alive",
-            "User-Agent": ua.get_random_user_agent(),
+    for i in range(offset, limit):
+        params: dict = {"start": i, "q": query, "hl": "en", "as_sdt": "0, 23"}
+        gs_url: str = f"{BASE_URL}/scholar" + "?" + urlencode(params)
+        json = {
+            "apiKey": secrets.SCRAPERAPI_KEY,
+            'url': gs_url
         }
+        scraper_url = "https://async.scraperapi.com/jobs"
 
-        # TODO ADD API KEY TO PARAMS
+        data: dict = run_async_job(scraper_url, json)
 
-        # params = {"start": i, "q": "UMMZ+bird", "hl": "en", "as_sdt": "0, 23"}
-        params = {"start": i, "q": "UMMZ+bird", "hl": "en", "as_sdt": "0, 23"}
+        umpy.write.to_json(f"scarperapi_{i}.json", data)
 
-        # response = umpy.http.get_resource(BASE_URL, params)
-        response = requests.get(f"{BASE_URL}/scholar", params=params, headers=headers)
-        # print(response.request.headers)
-        response.raise_for_status()  # if 200 returns None
-        html: str = response.text
+
+        html: str = data["response"]["body"]
+        filename: str = f"gs-html-{i}-{dt.now().strftime('%Y%m%dT%H%M')}.html"
+        filepath: str = Path(__file__).parent.absolute().joinpath("output", filename)
+        print(f"\nfilepath={filepath}")
+        umpy.write.to_txt(filepath, [html])
 
         soup = bs4.BeautifulSoup(html, "lxml")
         for result in soup.select(".gs_r.gs_or.gs_scl"):
-            # print(f"type result = {type(result)}") # <class 'bs4.element.Tag'>
-            citation: dict = retrieve_citation(result)
-            citations.append(citation)
-
-        # print(json.dumps(citations, indent=2, ensure_ascii=False))
-
-        # print(f"HTML = {html}")
-
-        # umpy.write.to_txt(
-        #     f"./output/google_scholar-ummz-bird-{dt.now().strftime('%Y%m%dT%H%M')}.txt",
-        #     [html],
-        # )
-
-        # citations.extend(
-        #     [filter_data(doc, KEYS) for doc in response.json()["response"]["docs"]]
-        # )
-        # logger.info(f"{len(citations)} records retrieved")
-
-        time.sleep(12)  # pause to confound rate limit
+            citations.append(retrieve_citation(result))
+        logger.info(f"Citation successfully retrieved and appended to list.")
 
     # Write to file
     filepath = f"./output/google_scholar-ummz-bird-{dt.now().strftime('%Y%m%dT%H%M')}.json"
