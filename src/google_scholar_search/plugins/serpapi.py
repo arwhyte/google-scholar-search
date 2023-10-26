@@ -1,4 +1,5 @@
-class Scraper():
+from plugins.plugin import Plugin
+class Scraper(Plugin):
     """TODO"""
 
     def __init__(self) -> None:
