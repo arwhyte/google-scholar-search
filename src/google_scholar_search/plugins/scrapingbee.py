@@ -8,7 +8,7 @@ class SearchPlugin(Plugin):
         super().__init__(call_interval, max_calls, timeout)
 
     def __str__(self) -> str:
-        return "SerpAPI plugin"
+        return "Scrapingbee plugin"
 
     def scrape(self, query: str) -> str:
         """TODO"""
