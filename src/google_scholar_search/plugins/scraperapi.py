@@ -1,12 +1,15 @@
 import asyncio
 import requests
 import time
-
+import secrets
 from plugins.plugin import Plugin
 
 
 class SearchPlugin(Plugin):
     """TODO"""
+
+    api_endpoint = "https://api.scraperapi.com"
+    async_endpoint = "https://async.scraperapi.com/jobs"
 
     def __init__(self, call_interval: int = 5, max_calls: int = 100, timeout: int = 10) -> None:
         super().__init__(call_interval, max_calls, timeout)
@@ -18,8 +21,10 @@ class SearchPlugin(Plugin):
         """TODO"""
         pass
 
-    def run_job(self, url, json) -> dict:
+    def run_async_job(self, url, json) -> dict:
         """TODO"""
+
+        json["apiKey"] = secrets.SCRAPERAPI_KEY
 
         response: requests.Response = requests.post(url=url, json=json, timeout=self.timeout)
         response.raise_for_status()  # raises HTTPError if one occurred
@@ -27,7 +32,6 @@ class SearchPlugin(Plugin):
         data: dict = response.json()
         status: str = data["status"]
         status_url: str = data["statusUrl"]
-        # print(f"\nrun_job data={data}")
 
         calls: int = 0
         while not status == "finished" and calls < self.max_calls:
