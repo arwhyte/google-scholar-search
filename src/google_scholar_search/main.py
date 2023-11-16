@@ -3,7 +3,7 @@ import cli_arg_parser as ap
 import importlib as il
 import importlib.util as ilu
 import logging as lg
-import scrape
+import soup_scraper as soup
 import secrets
 import sys
 import umpyutl as umpy
@@ -73,9 +73,7 @@ def main(args):
         print(f"\nfilepath={filepath}")
         umpy.write.to_txt(filepath, [html])
 
-        soup = bs4.BeautifulSoup(html, "lxml")
-        for html in soup.select(".gs_r.gs_or.gs_scl"):
-            citations.append(scrape.retrieve_citation(BASE_URL, html))
+        citations.extend(soup.SoupScraper(BASE_URL, html).scrape())
         logger.info(f"Citation successfully retrieved and appended to list.")
 
     # Write to file

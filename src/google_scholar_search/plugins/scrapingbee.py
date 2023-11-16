@@ -9,7 +9,3 @@ class SearchPlugin(Plugin):
 
     def __str__(self) -> str:
         return "Scrapingbee plugin"
-
-    def scrape(self, query: str) -> str:
-        """TODO"""
-        pass

@@ -1,4 +1,3 @@
-import asyncio
 import requests
 import time
 import secrets
@@ -17,10 +16,6 @@ class SearchPlugin(Plugin):
     def __str__(self) -> str:
         return "ScraperAPI plugin"
 
-    def scrape(self, query: str) -> str:
-        """TODO"""
-        pass
-
     def run_async_job(self, url, json) -> dict:
         """TODO"""
 
@@ -38,10 +33,10 @@ class SearchPlugin(Plugin):
             # await asyncio.sleep(self.call_interval)
             time.sleep(self.call_interval)
 
-            response: requests.Response = requests.get(status_url, timeout=self.timeout)
+            response = requests.get(status_url, timeout=self.timeout)
             response.raise_for_status()  # raises HTTPError if one occurred
 
-            data: dict = response.json()
+            data = response.json()
             status = data["status"].lower()
             calls += 1
         return data

@@ -8,8 +8,3 @@ class Plugin(ABC):
         self.call_interval = call_interval
         self.max_calls = max_calls
         self.timeout = timeout
-
-    @abstractmethod
-    def scrape(self, query: str) -> str:
-        """TODO"""
-        pass
