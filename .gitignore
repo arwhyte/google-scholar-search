@@ -5,6 +5,7 @@
 
 # Output files
 *.json
+*.html
 
 ### VS Code ###
 *.code-workspace
